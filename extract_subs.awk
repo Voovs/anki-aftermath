@@ -1,17 +1,19 @@
 #!/usr/bin/env -S awk -f
+# A stage machine for copying out a time range of subtitles from an .srt file.
+# Should work with any >1989 awk implementation
 #
 # ARGS:
-#   time (int):  Starting time in milliseconds of cut
-#   range (int): How many milliseconds around the current time stamp to cut
-#   title (str): Optional. Name of file
-#   output_file (str): File to print all output to
+#   time <int>:  Starting time in milliseconds of cut
+#   range <int>: How many milliseconds around the current time stamp to cut
+#   title [str]: Optional. Name of file
+#   output_file <str>: File to print all output to
 
 BEGIN {
     time = int(time);
     lower_time = int(time - range);
     upper_time = int(time + range);
 
-    relative_pos = "Before";  # Track if interval is Before, In, After `time`
+    relative_pos = "Before";  # Track if interval is [Before, In, After] `time`
 
     # Matches .srt time stamp format. In the unlikely case the subtitles
     # themselves match this expression, the output will be odd
@@ -20,15 +22,11 @@ BEGIN {
     #     20:23:35,647 --> 20:23:39,518
     is_time_line = "^[0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]{3} --> [0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]{3}[:space:]*$";
 
-    if (title) printf "%s\n", title > output_file;
+    if (title) printf "%s\n", title >> output_file;
 
     printf "Subs from: %s to %s\n====\n\n",
                format_ms(lower_time),
-               format_ms(upper_time) > output_file;
-
-    printf "Subs from: %s to %s\n====\n\n",
-               lower_time,
-               upper_time > output_file;
+               format_ms(upper_time) >> output_file;
 }
 
 $0 ~ is_time_line {
@@ -41,14 +39,14 @@ $0 ~ is_time_line {
 
     # Clearly delimits the subtitles that were displayed during the screenshot
     if (start_time <= time && time <= end_time) {
-        print "Screenshot subs ====>>> "format_ms(start_time) > output_file;
+        print "Screenshot subs ====>>> "format_ms(start_time) >> output_file;
         prev_end = end_time;
         relative_pos = "In";
     } else if (relative_pos == "Before" && time < start_time) {
-        print "Screenshot time (no subs) ====>>> "format_ms(time) > output_file;
+        print "Screenshot time (no subs) ====>>> "format_ms(time) >> output_file;
         relative_pos = "After";
     } else if (relative_pos == "In") {
-        print "======================= "format_ms(prev_end) > output_file;
+        printf "======================= %s\n\n", format_ms(prev_end) >> output_file;
         relative_pos = "After";
     }
 
@@ -56,7 +54,8 @@ $0 ~ is_time_line {
 
 # Doesn't print .str file's subtitle timestamp and number
 $0 !~ is_time_line && is_printing && !/^[0-9]+[:space:]*$/ {
-    print $0 > output_file
+    if ($0 !~ /^$/ || relative_pos != "In")
+        print $0 >> output_file;
 }
 
 
@@ -121,5 +120,5 @@ function format_ms(milli,    hours, mins, secs, ms) {
     #} else {
     #    printf "ERROR:\n\tSubtitle interval: %s --> %s\n\tTime Range: %s : %s\n", \
     #           format_ms(start_time), format_ms(end_time),\
-    #           format_ms(lower_time), format_ms(upper_time) > output_file;
+    #           format_ms(lower_time), format_ms(upper_time) >> output_file;
     #}

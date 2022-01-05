@@ -1,32 +1,29 @@
-// mp.utils.read_file(sub_file).split("\n")
-// mp.utils.write_file(output, parsed_str)
 function extractSubs(time_range, save_dir) {
+    var save_file = save_dir + "/subtitles.txt";
     var sub_file = createSubFile();
 
-    saveSubs(sub_file, time_range, save_dir);
+    saveSubs(sub_file, time_range, save_file);
 
-    mp.osd_message("Saved sub file", 1);
+    return save_file
 }
 
 
-function saveSubs(sub_file, time_range, save_dir) {
+// Save all the subtitles in a +/- interval of time_range from current time
+// Args:
+//     sub_file (path):    Path to ource subtitle file. Must be .srt format
+//     time_range (float): Time range of subtitles to save
+//     save_file (path):   Path to file to save
+function saveSubs(sub_file, time_range, save_file) {
     var script_dir = mp.get_script_directory();
     var sub_time = mp.get_property_native('time-pos') - mp.get_property_native('sub-delay');
-
-    mp.msg.info(
-        "Time pos: " + mp.get_property_native('time-pos') + "\n"
-        + "Sub delay: " + mp.get_property_native('sub-delay'));
 
     var args = [
             script_dir + "/extract_subs.awk",
                 "-v", "title=" + mp.get_property('filename/no-ext'),
                 "-v", "time="  + Math.round(sub_time   * 1000),
                 "-v", "range=" + Math.round(time_range * 1000),
-                "-v", "output_file=" + save_dir + "/subs.txt",
+                "-v", "output_file=" + save_file,
                 "" + sub_file + ""];
-
-    mp.msg.info(args.toString());
-    mp.msg.info(args[4]);
 
     var subs = mp.command_native_async({
         name: "subprocess",
@@ -36,6 +33,8 @@ function saveSubs(sub_file, time_range, save_dir) {
 }
 
 
+// Path at which to save the source .srt file. This directory is removed when
+// mpv exits
 function subFileSavePath(sub_file_path) {
     var script_dir = mp.get_script_directory();
     var save_name  = sub_file_path.replace(/^.*\//, '')  // Basename
@@ -44,6 +43,21 @@ function subFileSavePath(sub_file_path) {
     mp.command_native({
         name: "subprocess",
         args: ["mkdir", "-p", script_dir + "/subtitles"],
+    });
+
+    // TODO: Only register this event once?
+    mp.register_event("shutdown", function () {
+        var sub_dir = mp.utils.file_info(script_dir + "/subtitles");
+
+        if (typeof sub_dir != 'undefined' && sub_dir.is_dir) {
+            mp.command_native({
+                name: "subprocess",
+                capture_stdout: "no",
+                capture_stderr: "no",
+                playback_only: false,
+                args: ["rm", "-r", script_dir + "/subtitles"],
+            });
+        }
     });
 
     return script_dir + "/subtitles/" + save_name
@@ -55,30 +69,43 @@ function fileExists(file_path) {
 }
 
 
+// Create an .srt file from the current subtitle track. Works with .mkv and
+// .ass formats. If the file already exists, that one is used instead
 function createSubFile() {
     var cw_dir       = mp.get_property_native('working-directory');
     var sub_filename = mp.get_property_native('current-tracks/sub/external-filename');
     var sub_source   = sub_filename ? sub_filename : mp.get_property('filename');
 
-    var from = cw_dir + "/" + sub_source;
-    var to   = subFileSavePath(from);
+    var path_from = cw_dir + "/" + sub_source;
+    var path_to   = subFileSavePath(path_from);
 
-    if (!fileExists(to)) {
+    if (!fileExists(path_to)) {
+        // TODO: Check if this process exits without an error
         // Use blocking process, otherwise sed will run before file is created
-        mp.command_native({
+        var subs = mp.command_native({
             name: "subprocess",
-            capture_stdout: false,
-            args: ["ffmpeg", "-i", "" + from + "", "-map", "0:s:0", "" + to + ""],
+            capture_stdout: true,
+            args: ["ffmpeg",
+                        "-i", path_from,
+                        "-map", "0:s:0",
+                        "-f", "srt",
+                        "-hide_banner",
+                        "-loglevel", "error",
+                        "-",
+            ],
         });
 
-        // TODO: Linux portability
-        // + "\"sed -i 's#<[^>]*>##g' '" + to + "'\"");
-        // Strip out html tags
-        mp.command("run /usr/bin/env -S bash -c "
-                    + "\"sed -i '' 's#<[^>]*>##g' '" + to + "'\"");
+        // Strip out unessential characters. Makes it easier to read
+        var clean_subs = subs.stdout
+                             .replace(/<[^>]*>/g, '')  // Html tag
+                             .replace(/\u000D/g, '')   // Return carriage
+                             .replace(/\u202A/g, '')   // Left to right embed
+                             .replace(/\u202C/g, '');  // Right to left embed
+
+        mp.utils.write_file("file://" + path_to, clean_subs);
     }
 
-    return to
+    return path_to
 }
 
 
