@@ -2,6 +2,7 @@ function extractSubs(time_range, save_dir) {
     var save_file = save_dir + "/subtitles.txt";
     var sub_file = createSubFile();
 
+    audioTrimmer(sub_file, time_range, save_dir + "/trim_audio.sh");
     saveSubs(sub_file, time_range, save_file);
 
     return save_file
@@ -10,7 +11,7 @@ function extractSubs(time_range, save_dir) {
 
 // Save all the subtitles in a +/- interval of time_range from current time
 // Args:
-//     sub_file (path):    Path to ource subtitle file. Must be .srt format
+//     sub_file (path):    Path to source subtitle file. Must be .srt format
 //     time_range (float): Time range of subtitles to save
 //     save_file (path):   Path to file to save
 function saveSubs(sub_file, time_range, save_file) {
@@ -29,6 +30,30 @@ function saveSubs(sub_file, time_range, save_file) {
         name: "subprocess",
         capture_stdout: true,
         args: args,
+    });
+}
+
+
+// Create an executable file for audio_trimmer
+// Args:
+//     sub_file (path):    Path to source subtitle file. Must be .srt format
+//     time_range (float): Time range of subtitles to save
+//     save_file (path):   Path to file to save
+function audioTrimmer(sub_file, time_range, save_file) {
+    var script_dir = mp.get_script_directory();
+    var sub_offset = mp.get_property_native('sub-delay');
+    var sub_time   = mp.get_property_native('time-pos') - sub_offset;
+
+    mp.command_native_async({
+        name: "subprocess",
+        args: [
+            script_dir + "/audio_trimmer.awk",
+                "-v", "title=" + mp.get_property('filename/no-ext'),
+                "-v", "time="  + Math.round(sub_time   * 1000),
+                "-v", "range=" + Math.round(time_range * 1000),
+                "-v", "offset="+ Math.round(sub_offset * 1000),
+                "-v", "output_file=" + save_file,
+                "" + sub_file + ""],
     });
 }
 
@@ -81,7 +106,6 @@ function createSubFile() {
 
     if (!fileExists(path_to)) {
         // TODO: Check if this process exits without an error
-        // Use blocking process, otherwise sed will run before file is created
         var subs = mp.command_native({
             name: "subprocess",
             capture_stdout: true,

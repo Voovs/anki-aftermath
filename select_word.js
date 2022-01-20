@@ -1,10 +1,10 @@
 // Edit these
 var key_binds = {
     // Keys to move selection. Letters mean `move<side><plus or minus>`
-    moveLP: "q",
-    moveLM: "w",
-    moveRM: "e",
-    moveRP: "r",
+    moveLP: "1",
+    moveLM: "2",
+    moveRM: "3",
+    moveRP: "4",
 
     // Keys to exit the selection menu. One of these must be pressed before the
     // next menu can come up

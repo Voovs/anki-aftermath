@@ -2,8 +2,6 @@
 //var root_save_dir = mp.utils.getenv('HOME') + '/Desktop/anki_todo';
 //
 // Roadmap
-// - Delete srt on exit
-// - Word selection
 // - Automatic deinflection
 // - Generator script? (audio trimmer, anki upload)
 // - Sample card generator
@@ -73,19 +71,11 @@ function saveScreenshot() {
 
 // Save +/-10s of audio from the current position
 function saveAudio(time) {
-    mp.command_native_async({
-        name: "subprocess",
-        capture_stdout: false,
-        args: [
-            "ffmpeg",
-                "-ss", String(Math.floor(time) - 10),
-                "-t",  String(20),
-                "-i",  mp.get_property('path'),
-                "-hide_banner",
-                "-loglevel", "error",
-                opts.save_dir + "/audio.mp3",
-        ],
-    })
+    var start = Math.floor(time) - opts.time_range;
+    var length = opts.time_range * 2;
+    var save_path = opts.save_dir + "/audio.mp3";
+
+    utils.ffmpeg_audio(start, length, save_path)
 }
 
 

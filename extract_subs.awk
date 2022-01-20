@@ -1,5 +1,5 @@
 #!/usr/bin/env -S awk -f
-# A stage machine for copying out a time range of subtitles from an .srt file.
+# A state machine for copying out a time range of subtitles from an .srt file.
 # Should work with any >1989 awk implementation
 #
 # ARGS:
@@ -40,6 +40,8 @@ $0 ~ is_time_line {
     # Clearly delimits the subtitles that were displayed during the screenshot
     if (start_time <= time && time <= end_time) {
         print "Screenshot subs ====>>> "format_ms(start_time) >> output_file;
+        printf "%s:%s\n", start_time, end_time;
+        printf "%s:%s\n", format_ms(start_time), format_ms(end_time);
         prev_end = end_time;
         relative_pos = "In";
     } else if (relative_pos == "Before" && time < start_time) {
@@ -78,8 +80,8 @@ function time_in_ms(time,    a, b, secs) {
 #     format_ms(42709)   == "00:00:42.709"
 #     format_ms(3738472) == "01:02:18.472"
 function format_ms(milli,    hours, mins, secs, ms) {
-    secs  = int(substr(milli, 0, length(milli) - 3));
-    ms    = substr(milli, length(milli) - 2);
+    secs = int(substr(milli, 0, length(milli) - 3));
+    ms   = substr(milli, length(milli) - 2);
 
     while (secs >= 3600) {
         secs -= 3600;

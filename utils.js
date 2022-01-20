@@ -35,5 +35,28 @@ function newSaveDirectory(save_root) {
 }
 
 
+// Slice out a clip of audio from the current video
+// Args:
+//  start: Starting time in seconds of audio clip
+//  length: Duration of audio clip. (end_time - start_time)
+//  save_path: File to write audio into. Should be an mp3 or similar
+function ffmpeg_audio(start, length, save_path) {
+    mp.command_native_async({
+        name: "subprocess",
+        capture_stdout: false,
+        args: [
+            "ffmpeg",
+                "-ss", String(start),
+                "-t",  String(length),
+                "-i",  mp.get_property('path'),
+                "-hide_banner",
+                "-loglevel", "error",
+                save_path,
+        ],
+    })
+}
+
+
 exports.newSaveDirectory = newSaveDirectory;
 exports.formatTime = formatTime;
+exports.ffmpeg_audio = ffmpeg_audio;
